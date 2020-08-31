@@ -50,10 +50,10 @@ exports.default = function(babel) {
             const accessPath = isCompilerAccessor(types, left); //Verifica a variavel e caminho que está sendo acessado
             if (accessPath && accessPath[0] === 'COMPILER') { //Se esta sendo um acesso a variavel pre-definida 'COMPILER' (ex. COMPILER.HomeScreen.BannerAvailable)
               const parameter = accessPath.slice(1).reduce((r, k) => r[k], state.opts.define())[left.get('property').node.name];
-              if (typeof parameter !== 'boolean') {
+              if (typeof parameter !== 'boolean') { //Por enquanto esta biblioteca só funciona para expressões em que o parametro é booleano
                 throw new Error(`The parameter ${accessPath.join('.')} is not of type boolean. This library is not ready for parameters other than boolean ones`);
               }
-              if (typeof left.node.operator !== '&&') {
+              if (path.node.operator !== '&&') { //Por enquanto só funciona para expressões &&
                 throw new Error('This library is only compatible with expressions of type && on the format "COMPILER.a.parameter.accessor && THE_RESULT"');
               }
               if (parameter) { //Verifica o valor dessa expressão
