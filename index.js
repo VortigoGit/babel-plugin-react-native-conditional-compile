@@ -17,6 +17,12 @@ function isCompilerAccessor(types, path) {
   }
 }
 
+function validateCompilerParameter(parameter,accessPath) {
+  if (typeof parameter !== 'boolean') { //Por enquanto esta biblioteca só funciona para expressões em que o parametro é booleano
+    throw new Error(`The parameter ${accessPath.join('.')} is not of type boolean. This library is not ready for parameters other than boolean ones`);
+  }
+}
+
 exports.default = function(babel) {
   var types = babel.types,
     mapKeys = [];
@@ -30,16 +36,30 @@ exports.default = function(babel) {
         }
       },
       Conditional: {
-        exit: function exit() {
+        exit: function exit(path, state) {
           //Basicos de uma implementação de um plugin https://github.com/jamiebuilds/babel-handbook/blob/master/translations/en/plugin-handbook.md#toc-paths
           //Nodos de AST para expressões condicionais https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md#conditionalexpression
-          //Validar blocos de código if???
+          var test = path.get('test') //Obtém a expressão de teste
+          if (types.isMemberExpression(test)) { //Somente valida expressões do tipo memberExpression (a.member.access)
+            const accessPath = isCompilerAccessor(types, test); //Verifica a variavel e caminho que está sendo acessado
+            if (accessPath && accessPath[0] === 'COMPILER') { //Se é a variável prédefinida
+              //Obtém o parametro acessado
+              const parameter = accessPath.slice(1).reduce((r, k) => r[k], state.opts.define())[left.get('property').node.name];
+              validateCompilerParameter(parameter, accessPath);
+              if (parameter) { //Verifica o valor dessa expressão
+                //Se é verdadeiro, substitui a expressão lógica com o resultado da direita
+                path.replaceWith(path.get('consequent'));
+              } else {
+                //Senão substitui a expressão inteira com um valor null (removendo qualquer referência extra oriunda da expressão)
+                path.replaceWith(types.nullLiteral());
+              }
+            }
+          }
         }
       },
       /**
        * @todo Expressões mais complexas
        * @todo Expressões or (||)
-       * @todo Condicionais???
        */
       LogicalExpression: { //Resolve as expressoes logicas left (&& ||) right
         exit: function exit(path, state) {
@@ -50,9 +70,7 @@ exports.default = function(babel) {
             const accessPath = isCompilerAccessor(types, left); //Verifica a variavel e caminho que está sendo acessado
             if (accessPath && accessPath[0] === 'COMPILER') { //Se esta sendo um acesso a variavel pre-definida 'COMPILER' (ex. COMPILER.HomeScreen.BannerAvailable)
               const parameter = accessPath.slice(1).reduce((r, k) => r[k], state.opts.define())[left.get('property').node.name];
-              if (typeof parameter !== 'boolean') { //Por enquanto esta biblioteca só funciona para expressões em que o parametro é booleano
-                throw new Error(`The parameter ${accessPath.join('.')} is not of type boolean. This library is not ready for parameters other than boolean ones`);
-              }
+              validateCompilerParameter(parameter, accessPath);
               if (path.node.operator !== '&&') { //Por enquanto só funciona para expressões &&
                 throw new Error('This library is only compatible with expressions of type && on the format "COMPILER.a.parameter.accessor && THE_RESULT"');
               }
