@@ -39,19 +39,23 @@ exports.default = function(babel) {
         exit: function exit(path, state) {
           //Basicos de uma implementação de um plugin https://github.com/jamiebuilds/babel-handbook/blob/master/translations/en/plugin-handbook.md#toc-paths
           //Nodos de AST para expressões condicionais https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md#conditionalexpression
-          var test = path.get('test') //Obtém a expressão de teste
-          if (types.isMemberExpression(test)) { //Somente valida expressões do tipo memberExpression (a.member.access)
+          //Validar blocos de código if???
+          var test = path.get('test') //Obtém a expressao de teste da condicao
+          if (types.isMemberExpression(test)) { // Somente expressóes do yipo acesso de membro (a.property.acessor)
             const accessPath = isCompilerAccessor(types, test); //Verifica a variavel e caminho que está sendo acessado
-            if (accessPath && accessPath[0] === 'COMPILER') { //Se é a variável prédefinida
-              //Obtém o parametro acessado
-              const parameter = accessPath.slice(1).reduce((r, k) => r[k], state.opts.define())[left.get('property').node.name];
+            if (accessPath && accessPath[0] === 'COMPILER') { //Se é a variavel predefinida
+              const parameter = accessPath.slice(1).reduce((r, k) => r[k], state.opts.define())[test.get('property').node.name]; //Obtém o parametro acessado
               validateCompilerParameter(parameter, accessPath);
               if (parameter) { //Verifica o valor dessa expressão
                 //Se é verdadeiro, substitui a expressão lógica com o resultado da direita
                 path.replaceWith(path.get('consequent'));
               } else {
                 //Senão substitui a expressão inteira com um valor null (removendo qualquer referência extra oriunda da expressão)
-                path.replaceWith(types.nullLiteral());
+                if (path.get('alternate').node) { //Se existe um else
+                  path.replaceWith(path.get('alternate')); //Substitui com else
+                } else {
+                  path.remove(); //Senão somente remove o nodo
+                }
               }
             }
           }
@@ -60,6 +64,7 @@ exports.default = function(babel) {
       /**
        * @todo Expressões mais complexas
        * @todo Expressões or (||)
+       * @todo Condicionais???
        */
       LogicalExpression: { //Resolve as expressoes logicas left (&& ||) right
         exit: function exit(path, state) {
